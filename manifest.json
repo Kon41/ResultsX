@@ -1,15 +1,23 @@
 {
-  "name": "CBSE Class 10 Second Board Result Watch",
-  "short_name": "Result Watch",
-  "description": "Tracks the expected CBSE Class 10 Second Board Exam result date from official sources, with alarm and notification.",
-  "start_url": "./index.html",
-  "scope": "./",
-  "display": "standalone",
-  "background_color": "#0b2e4f",
-  "theme_color": "#0b2e4f",
-  "orientation": "portrait",
+  "short_name": "ResultX",
+  "name": "CBSE Class 10 Board Result Watch",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
-  ]
+    {
+      "src": "icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#f4ecd8",
+  "theme_color": "#0b2e4f",
+  "display": "standalone",
+  "orientation": "portrait"
 }
