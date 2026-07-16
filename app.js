@@ -50,6 +50,9 @@
   function playAlarmBeep() {
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
       osc.type = 'square';
@@ -64,6 +67,8 @@
   }
 
   function startAlarmLoop() {
+    // FIX: Always stop any existing loop first to prevent interval stacking (ghost loops)
+    stopAlarmLoop();
     playAlarmBeep();
     alarmLoopId = setInterval(playAlarmBeep, 900);
     if (navigator.vibrate) {
@@ -72,8 +77,13 @@
   }
 
   function stopAlarmLoop() {
-    if (alarmLoopId) clearInterval(alarmLoopId);
-    alarmLoopId = null;
+    if (alarmLoopId) {
+      clearInterval(alarmLoopId);
+      alarmLoopId = null;
+    }
+    if (navigator.vibrate) {
+      navigator.vibrate(0); // Stop vibration immediately
+    }
   }
 
   function showAlarmOverlay(title, body) {
@@ -86,6 +96,13 @@
   dismissAlarmBtn.addEventListener('click', () => {
     alarmOverlay.hidden = true;
     stopAlarmLoop();
+
+    // FIX: If the scheduled alarm has expired, wipe it from localStorage automatically
+    // so it never re-triggers on reload or background checks.
+    const stored = loadAlarm();
+    if (stored && Date.now() >= new Date(stored).getTime()) {
+      clearAlarm();
+    }
   });
 
   function fireNotification(title, body) {
@@ -191,10 +208,18 @@
     }
   }
 
-  // ---------- Data loading (network-first, cache-busted) ----------
+  // ---------- Data loading (network-first, strict cache-busting) ----------
   async function loadData() {
     try {
-      const res = await fetch('data.json?ts=' + Date.now(), { cache: 'no-store' });
+      // FIX: Added strict headers so Service Workers and mobile browsers do not trap old JSON
+      const res = await fetch('data.json?ts=' + Date.now(), { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       return await res.json();
     } catch (e) {
       try {
