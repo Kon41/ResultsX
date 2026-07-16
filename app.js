@@ -67,7 +67,7 @@
   }
 
   function startAlarmLoop() {
-    // FIX: Always stop any existing loop first to prevent interval stacking (ghost loops)
+    // Prevent interval stacking (ghost loops) by stopping any existing loop first
     stopAlarmLoop();
     playAlarmBeep();
     alarmLoopId = setInterval(playAlarmBeep, 900);
@@ -82,28 +82,42 @@
       alarmLoopId = null;
     }
     if (navigator.vibrate) {
-      navigator.vibrate(0); // Stop vibration immediately
+      navigator.vibrate(0); // Kill vibration immediately
     }
   }
 
   function showAlarmOverlay(title, body) {
     alarmOverlayTitle.textContent = title;
     alarmOverlayBody.textContent = body;
+    // Force CSS display so it renders properly without specificity conflicts
+    alarmOverlay.style.removeProperty('display');
+    alarmOverlay.style.display = 'flex';
     alarmOverlay.hidden = false;
     startAlarmLoop();
   }
 
-  dismissAlarmBtn.addEventListener('click', () => {
+  // Bulletproof dismiss handler
+  function dismissAlarm() {
+    // 1. Force inline CSS hiding to override any style.css rules
+    alarmOverlay.style.setProperty('display', 'none', 'important');
     alarmOverlay.hidden = true;
-    stopAlarmLoop();
 
-    // FIX: If the scheduled alarm has expired, wipe it from localStorage automatically
-    // so it never re-triggers on reload or background checks.
+    // 2. Stop audio oscillator loop and vibration immediately
+    stopAlarmLoop();
+    if (audioCtx && audioCtx.state !== 'closed') {
+      try { audioCtx.suspend(); } catch (e) { /* ignore */ }
+    }
+
+    // 3. Automatically wipe expired alarms from localStorage so it never re-rings
     const stored = loadAlarm();
     if (stored && Date.now() >= new Date(stored).getTime()) {
       clearAlarm();
+    } else {
+      localStorage.removeItem(FIRED_KEY);
     }
-  });
+  }
+
+  dismissAlarmBtn.addEventListener('click', dismissAlarm);
 
   function fireNotification(title, body) {
     if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
@@ -151,188 +165,4 @@
 
   // ---------- Alarm scheduling ----------
   function loadAlarm() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? raw : null;
-  }
-
-  function saveAlarm(isoLocal) {
-    localStorage.setItem(STORAGE_KEY, isoLocal);
-    localStorage.removeItem(FIRED_KEY);
-  }
-
-  function clearAlarm() {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(FIRED_KEY);
-    alarmInput.value = '';
-    alarmStatus.textContent = 'No alarm set.';
-  }
-
-  function describeAlarm(isoLocal) {
-    const d = new Date(isoLocal);
-    if (isNaN(d)) return 'No alarm set.';
-    return 'Alarm set for ' + d.toLocaleString(undefined, {
-      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    }) + '.';
-  }
-
-  saveAlarmBtn.addEventListener('click', () => {
-    if (!alarmInput.value) {
-      alarmStatus.textContent = 'Pick a date and time first.';
-      return;
-    }
-    saveAlarm(alarmInput.value);
-    alarmStatus.textContent = describeAlarm(alarmInput.value);
-  });
-
-  clearAlarmBtn.addEventListener('click', clearAlarm);
-
-  function initAlarmUI() {
-    const stored = loadAlarm();
-    if (stored) {
-      alarmInput.value = stored;
-      alarmStatus.textContent = describeAlarm(stored);
-    }
-  }
-
-  function checkAlarm() {
-    const stored = loadAlarm();
-    if (!stored) return;
-    const target = new Date(stored).getTime();
-    const now = Date.now();
-    const alreadyFired = localStorage.getItem(FIRED_KEY) === stored;
-    if (now >= target && !alreadyFired) {
-      localStorage.setItem(FIRED_KEY, stored);
-      fireNotification('Your CBSE result alarm is ringing', 'The time you set has arrived — check the official result links in the app.');
-      showAlarmOverlay('Alarm', 'The time you set has arrived. Check the official result links below.');
-    }
-  }
-
-  // ---------- Data loading (network-first, strict cache-busting) ----------
-  async function loadData() {
-    try {
-      // FIX: Added strict headers so Service Workers and mobile browsers do not trap old JSON
-      const res = await fetch('data.json?ts=' + Date.now(), { 
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
-      return await res.json();
-    } catch (e) {
-      try {
-        const res = await fetch('data.json');
-        return await res.json();
-      } catch (e2) {
-        return null;
-      }
-    }
-  }
-
-  function daysBetween(a, b) {
-    const MS = 24 * 60 * 60 * 1000;
-    return Math.round((b - a) / MS);
-  }
-
-  function renderData(data) {
-    if (!data) {
-      statusValue.textContent = 'Could not load data.json';
-      statusMeta.textContent = 'Check your connection and reload the app.';
-      return;
-    }
-
-    // Status
-    if (data.resultDeclared) {
-      statusValue.textContent = 'Result declared';
-      statusValue.classList.add('declared');
-      statusMeta.textContent = data.officialResultDate
-        ? 'Official date on record: ' + data.officialResultDate
-        : 'Marked as declared — check the official links below.';
-
-      const alreadyNotified = localStorage.getItem(DECLARED_FIRED_KEY) === (data.officialResultDate || 'yes');
-      if (!alreadyNotified) {
-        localStorage.setItem(DECLARED_FIRED_KEY, data.officialResultDate || 'yes');
-        fireNotification('CBSE Class 10 Second Board Result is OUT', 'Go to cbseresults.nic.in or DigiLocker to check your result.');
-        showAlarmOverlay('Result Declared', 'The CBSE Class 10 Second Board result has been marked as declared. Check the official links below.');
-      }
-    } else {
-      statusValue.textContent = 'Not yet officially declared';
-      statusMeta.textContent = 'Last verified against official sources on ' + data.lastChecked + '.';
-    }
-
-    // Countdown / window
-    const win = data.expectedResultWindow;
-    if (win) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const start = new Date(win.earliest);
-      const end = new Date(win.latest);
-
-      if (today < start) {
-        const d = daysBetween(today, start);
-        countdownNumber.textContent = d;
-        countdownUnit.textContent = 'days until the expected window opens';
-      } else if (today > end) {
-        countdownNumber.textContent = '—';
-        countdownUnit.textContent = 'expected window has passed — awaiting official confirmation';
-      } else {
-        const d = daysBetween(today, end);
-        countdownNumber.textContent = d;
-        countdownUnit.textContent = 'days left in the expected window';
-      }
-
-      const fmt = (s) => new Date(s).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-      windowRange.textContent = fmt(win.earliest) + ' — ' + fmt(win.latest);
-      windowNote.textContent = win.note || '';
-    }
-
-    // Sources
-    sourceList.innerHTML = '';
-    (data.officialSources || []).forEach((s) => {
-      const li = document.createElement('li');
-      const a = document.createElement('a');
-      a.href = s.url;
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      a.textContent = s.name;
-      li.appendChild(a);
-      sourceList.appendChild(li);
-    });
-
-    // Statements
-    statementsList.innerHTML = '';
-    (win && win.statements || []).forEach((st) => {
-      const div = document.createElement('div');
-      div.className = 'statement';
-      div.innerHTML = `
-        <p class="statement-source">${st.source}</p>
-        <p class="statement-text">${st.statement}</p>
-        <p class="statement-reliability">${st.reliability}</p>
-      `;
-      statementsList.appendChild(div);
-    });
-
-    lastCheckedEl.textContent = 'Data last verified: ' + data.lastChecked;
-  }
-
-  async function refreshAll() {
-    const data = await loadData();
-    renderData(data);
-    checkAlarm();
-  }
-
-  // ---------- Init ----------
-  initAlarmUI();
-  refreshAll();
-
-  // Recheck alarm every 20s while the app is open, and re-pull data.json
-  // every 5 minutes in case the maintainer has marked the result as declared.
-  checkIntervalId = setInterval(checkAlarm, 20 * 1000);
-  setInterval(refreshAll, 5 * 60 * 1000);
-
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') refreshAll();
-  });
-})();
+    const raw = localStorage.getItem(STORAGE
