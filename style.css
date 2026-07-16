@@ -321,6 +321,11 @@ footer {
   animation: pulse-bg 1.2s infinite;
 }
 
+/* FIX: Forces the overlay to respect the [hidden] attribute */
+.alarm-overlay[hidden] {
+  display: none !important;
+}
+
 @keyframes pulse-bg {
   0%, 100% { background: rgba(7, 31, 56, 0.94); }
   50% { background: rgba(163, 59, 43, 0.94); }
