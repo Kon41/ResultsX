@@ -1,0 +1,45 @@
+{
+  "_howToUpdate": "Edit this file only. Set 'resultDeclared' to true and fill 'officialResultDate' the moment CBSE issues an official notice. Update 'lastChecked' whenever you verify against cbse.gov.in. Commit and push — the app reads this file fresh (cache-busted) every time it's opened or checked.",
+
+  "lastChecked": "2026-07-16",
+  "resultDeclared": false,
+  "officialResultDate": null,
+
+  "exam": {
+    "name": "CBSE Class 10 Second Board Examination (Phase 2 / Session 2), 2026",
+    "examWindow": { "start": "2026-05-15", "end": "2026-05-21" },
+    "context": "First-ever CBSE two-board-exam cycle for Class 10 under NEP 2020. Phase 2 lets students improve up to 3 subjects or clear compartment; the higher of Phase 1 / Phase 2 marks counts."
+  },
+
+  "expectedResultWindow": {
+    "earliest": "2026-06-22",
+    "latest": "2026-07-31",
+    "note": "No written CBSE notification has fixed an exact date yet. This range is built only from on-record statements by CBSE officials and CBSE's own published two-exam-system guidelines, not from unofficial rumours.",
+    "statements": [
+      {
+        "source": "CBSE Controller of Examinations, Dr. Sanyam Bhardwaj (public webinar on the two-board-exam system)",
+        "statement": "Said the board was targeting 30 June to declare the Class 10 second board exam result and close the cycle before Class 11 admissions begin.",
+        "reliability": "On-record official statement, not yet a written CBSE notice/circular"
+      },
+      {
+        "source": "CBSE circular on the two-examination scheme",
+        "statement": "States that results of the second examination will be declared in the month of June.",
+        "reliability": "Official CBSE circular language, but does not give an exact date"
+      }
+    ]
+  },
+
+  "officialSources": [
+    { "name": "CBSE official website", "url": "https://www.cbse.gov.in" },
+    { "name": "CBSE Results portal", "url": "https://cbseresults.nic.in" },
+    { "name": "DigiLocker", "url": "https://www.digilocker.gov.in" },
+    { "name": "UMANG App (web)", "url": "https://web.umang.gov.in" }
+  ],
+
+  "howToCheckResult": [
+    "Roll Number, School Number, Admit Card ID and Date of Birth (from your admit card) are required.",
+    "Visit cbseresults.nic.in and open the 'Secondary School Examination Results (Phase II)' link.",
+    "Or open DigiLocker / UMANG app and look under issued education documents.",
+    "Do not trust any site or message asking for payment, OTP, or that isn't one of the four official sources above."
+  ]
+}

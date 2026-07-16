@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Result Watch — CBSE Class 10 Second Board</title>
+<meta name="theme-color" content="#0b2e4f" />
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="icons/icon-192.png" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="ledger-line" aria-hidden="true"></div>
+
+<header class="letterhead">
+  <div class="seal" aria-hidden="true">
+    <svg viewBox="0 0 100 100" width="56" height="56">
+      <circle cx="50" cy="50" r="46" fill="none" stroke="#d4af37" stroke-width="3"/>
+      <circle cx="50" cy="50" r="36" fill="none" stroke="#d4af37" stroke-width="1.5"/>
+      <text x="50" y="58" text-anchor="middle" font-size="34" fill="#d4af37" font-family="Georgia, serif">X</text>
+    </svg>
+  </div>
+  <div class="letterhead-text">
+    <p class="eyebrow">Unofficial personal tracker</p>
+    <h1>CBSE Class 10 — Second Board Result Watch</h1>
+    <p class="subtitle">Dates below come only from CBSE's own statements and circulars. Nothing here is a rumour.</p>
+  </div>
+</header>
+
+<main>
+
+  <section class="status-card" id="statusCard" aria-live="polite">
+    <p class="status-label">Result status</p>
+    <p class="status-value" id="statusValue">Loading…</p>
+    <p class="status-meta" id="statusMeta"></p>
+  </section>
+
+  <section class="countdown-card">
+    <p class="section-label">01 — Expected window</p>
+    <div class="countdown" id="countdown">
+      <span id="countdownNumber">—</span>
+      <span class="countdown-unit">days into the expected window</span>
+    </div>
+    <p class="window-range" id="windowRange"></p>
+    <p class="window-note" id="windowNote"></p>
+  </section>
+
+  <section class="alarm-card">
+    <p class="section-label">02 — Your alarm</p>
+    <p class="hint">Set the date and time you want this app to alert you — for example, the day CBSE is expected to declare the result. The alarm rings while this app or tab is open (installed PWAs on Android also get best-effort background checks).</p>
+
+    <label class="field">
+      <span>Alert date &amp; time</span>
+      <input type="datetime-local" id="alarmInput" />
+    </label>
+
+    <div class="button-row">
+      <button id="saveAlarmBtn" class="btn btn-primary">Save alarm</button>
+      <button id="clearAlarmBtn" class="btn btn-ghost">Clear</button>
+    </div>
+
+    <p class="alarm-status" id="alarmStatus">No alarm set.</p>
+
+    <div class="button-row">
+      <button id="enableNotifBtn" class="btn btn-outline">Enable notifications</button>
+      <button id="testAlarmBtn" class="btn btn-outline">Test alarm now</button>
+    </div>
+    <p class="permission-status" id="permissionStatus"></p>
+  </section>
+
+  <section class="sources-card">
+    <p class="section-label">03 — Check your result only here</p>
+    <ul class="source-list" id="sourceList"></ul>
+    <p class="hint">Enter Roll Number, School Number, Admit Card ID and Date of Birth exactly as printed on your admit card. Ignore any other site or forwarded message.</p>
+  </section>
+
+  <section class="statements-card">
+    <p class="section-label">04 — What CBSE has actually said</p>
+    <div id="statementsList"></div>
+    <p class="last-checked" id="lastChecked"></p>
+  </section>
+
+</main>
+
+<div class="alarm-overlay" id="alarmOverlay" hidden>
+  <div class="alarm-overlay-content">
+    <div class="alarm-seal">
+      <svg viewBox="0 0 100 100" width="80" height="80">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#d4af37" stroke-width="3"/>
+        <circle cx="50" cy="50" r="36" fill="none" stroke="#d4af37" stroke-width="1.5"/>
+      </svg>
+    </div>
+    <h2 id="alarmOverlayTitle">Alarm</h2>
+    <p id="alarmOverlayBody">Your set time has arrived.</p>
+    <button id="dismissAlarmBtn" class="btn btn-primary">Dismiss</button>
+  </div>
+</div>
+
+<footer>
+  <p>Static site · no server · no tracking. Information sourced only from cbse.gov.in, cbseresults.nic.in, DigiLocker and UMANG.</p>
+</footer>
+
+<script src="app.js"></script>
+</body>
+</html>
