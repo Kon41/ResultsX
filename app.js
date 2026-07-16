@@ -35,7 +35,6 @@
   // ---------- Service worker ----------
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
-      // Best-effort periodic background sync (installed PWA, Android Chrome only)
       if ('periodicSync' in reg) {
         navigator.permissions.query({ name: 'periodic-background-sync' }).then((status) => {
           if (status.state === 'granted') {
@@ -46,62 +45,109 @@
     }).catch(() => {});
   }
 
-  // ---------- Sound ----------
+  // ---------- Sound (NEW Pleasant Triple-Chime Ringtone) ----------
   function playAlarmBeep() {
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      const osc = audioCtx.createOscillator();
-      const gain = audioCtx.createGain();
-      osc.type = 'square';
-      osc.frequency.value = 880;
-      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
-      osc.connect(gain).connect(audioCtx.destination);
-      osc.start();
-      osc.stop(audioCtx.currentTime + 0.45);
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+
+      const playTone = (freq, delay) => {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        
+        osc.type = 'sine'; // Smooth, pleasant tone instead of harsh buzz
+        osc.frequency.value = freq;
+        
+        const startTime = audioCtx.currentTime + delay;
+        gain.gain.setValueAtTime(0, startTime);
+        gain.gain.linearRampToValueAtTime(0.6, startTime + 0.03); // Quick fade in
+        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3); // Smooth fade out
+        
+        osc.connect(gain).connect(audioCtx.destination);
+        osc.start(startTime);
+        osc.stop(startTime + 0.35);
+      };
+
+      // Play a triple chime (G5, C6, E6 notes)
+      playTone(783.99, 0.0);
+      playTone(1046.50, 0.15);
+      playTone(1318.51, 0.30);
     } catch (e) { /* audio not available */ }
   }
 
   function startAlarmLoop() {
+    stopAlarmLoop();
     playAlarmBeep();
-    alarmLoopId = setInterval(playAlarmBeep, 900);
+    alarmLoopId = setInterval(playAlarmBeep, 1200); // Wait 1.2s between rings
     if (navigator.vibrate) {
       navigator.vibrate([300, 150, 300, 150, 300]);
     }
   }
 
   function stopAlarmLoop() {
-    if (alarmLoopId) clearInterval(alarmLoopId);
-    alarmLoopId = null;
+    if (alarmLoopId) {
+      clearInterval(alarmLoopId);
+      alarmLoopId = null;
+    }
+    if (navigator.vibrate) {
+      navigator.vibrate(0); 
+    }
   }
 
   function showAlarmOverlay(title, body) {
     alarmOverlayTitle.textContent = title;
     alarmOverlayBody.textContent = body;
+    alarmOverlay.style.removeProperty('display');
+    alarmOverlay.style.display = 'flex';
     alarmOverlay.hidden = false;
     startAlarmLoop();
   }
 
-  dismissAlarmBtn.addEventListener('click', () => {
+  function dismissAlarm() {
+    alarmOverlay.style.setProperty('display', 'none', 'important');
     alarmOverlay.hidden = true;
+
     stopAlarmLoop();
-  });
+    if (audioCtx && audioCtx.state !== 'closed') {
+      try { audioCtx.suspend(); } catch (e) { /* ignore */ }
+    }
+
+    const stored = loadAlarm();
+    if (stored && Date.now() >= new Date(stored).getTime()) {
+      clearAlarm();
+    } else {
+      localStorage.removeItem(FIRED_KEY);
+    }
+  }
+
+  dismissAlarmBtn.addEventListener('click', dismissAlarm);
+
+  // ---------- BUG FIX: Safe Notification Trigger ----------
+  function fallbackNotify(title, body) {
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        // This fails intentionally on Android Chrome, try/catch prevents the crash
+        new Notification(title, { body, icon: 'icon-192.png' });
+      } catch (err) {
+        console.warn('Native notification blocked by browser rule, bypassing...', err);
+      }
+    }
+  }
 
   function fireNotification(title, body) {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    if ('serviceWorker' in navigator) {
       navigator.serviceWorker.ready.then((reg) => {
         reg.showNotification(title, {
           body,
-          icon: 'icons/icon-192.png',
-          badge: 'icons/icon-192.png',
+          icon: 'icon-192.png', // Fixed root path
+          badge: 'icon-192.png', // Fixed root path
           vibrate: [300, 150, 300],
           requireInteraction: true,
           tag: 'cbse-result-alarm'
         });
-      });
-    } else if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification(title, { body, icon: 'icons/icon-192.png' });
+      }).catch(() => fallbackNotify(title, body));
+    } else {
+      fallbackNotify(title, body);
     }
   }
 
@@ -184,6 +230,7 @@
     const target = new Date(stored).getTime();
     const now = Date.now();
     const alreadyFired = localStorage.getItem(FIRED_KEY) === stored;
+    
     if (now >= target && !alreadyFired) {
       localStorage.setItem(FIRED_KEY, stored);
       fireNotification('Your CBSE result alarm is ringing', 'The time you set has arrived — check the official result links in the app.');
@@ -191,10 +238,17 @@
     }
   }
 
-  // ---------- Data loading (network-first, cache-busted) ----------
+  // ---------- Data loading ----------
   async function loadData() {
     try {
-      const res = await fetch('data.json?ts=' + Date.now(), { cache: 'no-store' });
+      const res = await fetch('data.json?ts=' + Date.now(), { 
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      });
       return await res.json();
     } catch (e) {
       try {
@@ -218,7 +272,6 @@
       return;
     }
 
-    // Status
     if (data.resultDeclared) {
       statusValue.textContent = 'Result declared';
       statusValue.classList.add('declared');
@@ -237,7 +290,6 @@
       statusMeta.textContent = 'Last verified against official sources on ' + data.lastChecked + '.';
     }
 
-    // Countdown / window
     const win = data.expectedResultWindow;
     if (win) {
       const today = new Date();
@@ -263,7 +315,6 @@
       windowNote.textContent = win.note || '';
     }
 
-    // Sources
     sourceList.innerHTML = '';
     (data.officialSources || []).forEach((s) => {
       const li = document.createElement('li');
@@ -276,7 +327,6 @@
       sourceList.appendChild(li);
     });
 
-    // Statements
     statementsList.innerHTML = '';
     (win && win.statements || []).forEach((st) => {
       const div = document.createElement('div');
@@ -298,12 +348,9 @@
     checkAlarm();
   }
 
-  // ---------- Init ----------
   initAlarmUI();
   refreshAll();
 
-  // Recheck alarm every 20s while the app is open, and re-pull data.json
-  // every 5 minutes in case the maintainer has marked the result as declared.
   checkIntervalId = setInterval(checkAlarm, 20 * 1000);
   setInterval(refreshAll, 5 * 60 * 1000);
 
