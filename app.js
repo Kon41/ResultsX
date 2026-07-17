@@ -272,4 +272,68 @@
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') refreshAll();
   });
+  // ---------- Live News Check ----------
+  const runNewsBtn = $('runNewsBtn');
+  const newsResults = $('newsResults');
+
+  if (runNewsBtn) {
+    runNewsBtn.addEventListener('click', async () => {
+      // 1. Set UI to Loading state
+      runNewsBtn.disabled = true;
+      runNewsBtn.textContent = 'Scanning News...';
+      newsResults.hidden = false;
+      newsResults.innerHTML = '<div class="loading-text">Fetching latest news from Google...</div>';
+
+      try {
+        // 2. Fetch Google News RSS via a free JSON converter
+        // Searching specifically for the 2026 phase 2 / second board result
+        const searchQuery = encodeURIComponent('"CBSE" AND "Class 10" AND ("second board" OR "phase 2") AND "result"');
+        const rssUrl = `https://news.google.com/rss/search?q=${searchQuery}&hl=en-IN&gl=IN&ceid=IN:en`;
+        const apiUrl = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}`;
+
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        // 3. Process the results
+        if (data.status === 'ok' && data.items && data.items.length > 0) {
+          newsResults.innerHTML = ''; // Clear loading text
+          
+          // Get the top 4 latest articles
+          const topArticles = data.items.slice(0, 4);
+          
+          topArticles.forEach(article => {
+            const div = document.createElement('div');
+            div.className = 'news-item';
+            
+            // Google News puts " - Publisher" at the end of the title. Let's split it out.
+            const titleParts = article.title.split(' - ');
+            const publisher = titleParts.length > 1 ? titleParts.pop() : 'News Outlet';
+            const cleanTitle = titleParts.join(' - ');
+            
+            // Format the published date
+            const pubDate = new Date(article.pubDate).toLocaleDateString(undefined, { 
+              month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' 
+            });
+
+            // Create the HTML for each article
+            div.innerHTML = `
+              <h3 class="news-item-title">
+                <a href="${article.link}" target="_blank" rel="noopener noreferrer">${cleanTitle}</a>
+              </h3>
+              <p class="news-item-meta">${publisher} • ${pubDate}</p>
+            `;
+            newsResults.appendChild(div);
+          });
+        } else {
+          newsResults.innerHTML = '<p class="hint">No recent news found for this exact topic right now. Try again later.</p>';
+        }
+      } catch (error) {
+        newsResults.innerHTML = '<p class="hint" style="color: var(--alert-red);">Failed to load news. Please check your internet connection.</p>';
+      } finally {
+        // 4. Reset the button
+        runNewsBtn.disabled = false;
+        runNewsBtn.textContent = 'Run News Check';
+      }
+    });
+  }
 })();
