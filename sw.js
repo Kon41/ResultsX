@@ -1,4 +1,4 @@
-const CACHE_NAME = 'result-watch-v2.01';
+const CACHE_NAME = 'result-watch-v3';
 const CORE_ASSETS = [
   './',
   './index.html',
