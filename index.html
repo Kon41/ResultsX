@@ -84,8 +84,20 @@
     <div id="statementsList"></div>
     <p class="last-checked" id="lastChecked"></p>
   </section>
-
-</main>
+    <!-- Add this just above </main> -->
+    <div class="news-card">
+      <h2 class="section-label">04 — Live News Check</h2>
+      <p class="hint">Scan trusted news outlets for the latest live updates on the CBSE Class 10 Second Board result.</p>
+      
+      <div class="button-row">
+        <button id="runNewsBtn" class="btn btn-primary">Run News Check</button>
+      </div>
+      
+      <div id="newsResults" class="news-results" hidden>
+        <!-- Live news articles will appear here -->
+      </div>
+    </div>
+ </main>
 
 <div class="alarm-overlay" id="alarmOverlay" hidden>
   <div class="alarm-overlay-content">
