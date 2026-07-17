@@ -5,6 +5,15 @@
   "resultDeclared": false,
   "officialResultDate": null,
 
+  "newsSignal": {
+    "_about": "Filled in automatically by .github/workflows/check-status.yml every 3 hours. It scans Google News for CBSE Class 10 second-board-result headlines from a fixed allowlist of established news publishers (see scripts/check_news.py). This is a heads-up signal only — it is NOT the same as 'resultDeclared', which should only be set once CBSE itself confirms it.",
+    "lastChecked": null,
+    "detected": false,
+    "detectedAt": null,
+    "source": null,
+    "sourceUrl": null
+  },
+
   "exam": {
     "name": "CBSE Class 10 Second Board Examination (Phase 2 / Session 2), 2026",
     "examWindow": { "start": "2026-05-15", "end": "2026-05-21" },

@@ -48,24 +48,27 @@
   </section>
 
   <section class="alarm-card">
-    <p class="section-label">02 — Your alarm</p>
-    <p class="hint">Set the date and time you want this app to alert you — for example, the day CBSE is expected to declare the result. The alarm rings while this app or tab is open (installed PWAs on Android also get best-effort background checks).</p>
+    <p class="section-label">02 — Automatic monitoring</p>
+    <p class="hint">Nothing to set up. A scheduled GitHub Actions job checks a trusted-news feed every 3 hours (see README), and this app itself re-reads that data every few minutes. If either an official confirmation or a trusted news report of the result is detected, the app rings, vibrates and sends a notification on its own — there is no manual "ring" button.</p>
 
-    <label class="field">
-      <span>Alert date &amp; time</span>
-      <input type="datetime-local" id="alarmInput" />
-    </label>
-
-    <div class="button-row">
-      <button id="saveAlarmBtn" class="btn btn-primary">Save alarm</button>
-      <button id="clearAlarmBtn" class="btn btn-ghost">Clear</button>
+    <div class="monitor-row">
+      <div class="monitor-item">
+        <p class="monitor-label">Official status — last verified</p>
+        <p class="monitor-value" id="officialLastChecked">—</p>
+      </div>
+      <div class="monitor-item">
+        <p class="monitor-label">Trusted-news scan — last run</p>
+        <p class="monitor-value" id="newsLastChecked">—</p>
+      </div>
+      <div class="monitor-item">
+        <p class="monitor-label">Trusted-news signal</p>
+        <p class="monitor-value" id="newsSignalValue">No report detected</p>
+      </div>
     </div>
-
-    <p class="alarm-status" id="alarmStatus">No alarm set.</p>
+    <p class="news-source-link" id="newsSourceLink"></p>
 
     <div class="button-row">
       <button id="enableNotifBtn" class="btn btn-outline">Enable notifications</button>
-      <button id="testAlarmBtn" class="btn btn-outline">Test alarm now</button>
     </div>
     <p class="permission-status" id="permissionStatus"></p>
   </section>

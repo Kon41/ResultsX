@@ -11,12 +11,11 @@
   const statementsList = $('statementsList');
   const lastCheckedEl = $('lastChecked');
 
-  const alarmInput = $('alarmInput');
-  const saveAlarmBtn = $('saveAlarmBtn');
-  const clearAlarmBtn = $('clearAlarmBtn');
-  const alarmStatus = $('alarmStatus');
+  const officialLastChecked = $('officialLastChecked');
+  const newsLastChecked = $('newsLastChecked');
+  const newsSignalValue = $('newsSignalValue');
+  const newsSourceLink = $('newsSourceLink');
   const enableNotifBtn = $('enableNotifBtn');
-  const testAlarmBtn = $('testAlarmBtn');
   const permissionStatus = $('permissionStatus');
 
   const alarmOverlay = $('alarmOverlay');
@@ -24,143 +23,96 @@
   const alarmOverlayBody = $('alarmOverlayBody');
   const dismissAlarmBtn = $('dismissAlarmBtn');
 
-  const STORAGE_KEY = 'cbseResultWatch.alarm';
-  const FIRED_KEY = 'cbseResultWatch.alarmFiredFor';
   const DECLARED_FIRED_KEY = 'cbseResultWatch.declaredNotified';
+  const NEWS_FIRED_KEY = 'cbseResultWatch.newsNotified';
 
   let audioCtx = null;
   let alarmLoopId = null;
-  let checkIntervalId = null;
 
   // ---------- Service worker ----------
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then((reg) => {
+      // Best-effort periodic background sync (installed PWA, Android Chrome only).
+      // The real, reliable automation is the GitHub Actions job that updates
+      // data.json every 3 hours — this is just an extra check in between.
       if ('periodicSync' in reg) {
         navigator.permissions.query({ name: 'periodic-background-sync' }).then((status) => {
           if (status.state === 'granted') {
-            reg.periodicSync.register('check-result-status', { minInterval: 12 * 60 * 60 * 1000 }).catch(() => {});
+            reg.periodicSync.register('check-result-status', { minInterval: 3 * 60 * 60 * 1000 }).catch(() => {});
           }
         }).catch(() => {});
       }
     }).catch(() => {});
   }
 
-  // ---------- Sound (NEW Pleasant Triple-Chime Ringtone) ----------
+  // ---------- Sound ----------
   function playAlarmBeep() {
     try {
       audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
-      if (audioCtx.state === 'suspended') audioCtx.resume();
-
-      const playTone = (freq, delay) => {
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        
-        osc.type = 'sine'; // Smooth, pleasant tone instead of harsh buzz
-        osc.frequency.value = freq;
-        
-        const startTime = audioCtx.currentTime + delay;
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(0.6, startTime + 0.03); // Quick fade in
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3); // Smooth fade out
-        
-        osc.connect(gain).connect(audioCtx.destination);
-        osc.start(startTime);
-        osc.stop(startTime + 0.35);
-      };
-
-      // Play a triple chime (G5, C6, E6 notes)
-      playTone(783.99, 0.0);
-      playTone(1046.50, 0.15);
-      playTone(1318.51, 0.30);
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'square';
+      osc.frequency.value = 880;
+      gain.gain.setValueAtTime(0.0001, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.4);
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start();
+      osc.stop(audioCtx.currentTime + 0.45);
     } catch (e) { /* audio not available */ }
   }
 
   function startAlarmLoop() {
-    stopAlarmLoop();
     playAlarmBeep();
-    alarmLoopId = setInterval(playAlarmBeep, 1200); // Wait 1.2s between rings
-    if (navigator.vibrate) {
-      navigator.vibrate([300, 150, 300, 150, 300]);
-    }
+    alarmLoopId = setInterval(playAlarmBeep, 900);
+    if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 300]);
   }
 
   function stopAlarmLoop() {
-    if (alarmLoopId) {
-      clearInterval(alarmLoopId);
-      alarmLoopId = null;
-    }
-    if (navigator.vibrate) {
-      navigator.vibrate(0); 
-    }
+    if (alarmLoopId) clearInterval(alarmLoopId);
+    alarmLoopId = null;
   }
 
   function showAlarmOverlay(title, body) {
     alarmOverlayTitle.textContent = title;
     alarmOverlayBody.textContent = body;
-    alarmOverlay.style.removeProperty('display');
-    alarmOverlay.style.display = 'flex';
     alarmOverlay.hidden = false;
     startAlarmLoop();
   }
 
-  function dismissAlarm() {
-    alarmOverlay.style.setProperty('display', 'none', 'important');
+  dismissAlarmBtn.addEventListener('click', () => {
     alarmOverlay.hidden = true;
-
     stopAlarmLoop();
-    if (audioCtx && audioCtx.state !== 'closed') {
-      try { audioCtx.suspend(); } catch (e) { /* ignore */ }
-    }
-
-    const stored = loadAlarm();
-    if (stored && Date.now() >= new Date(stored).getTime()) {
-      clearAlarm();
-    } else {
-      localStorage.removeItem(FIRED_KEY);
-    }
-  }
-
-  dismissAlarmBtn.addEventListener('click', dismissAlarm);
-
-  // ---------- BUG FIX: Safe Notification Trigger ----------
-  function fallbackNotify(title, body) {
-    if ('Notification' in window && Notification.permission === 'granted') {
-      try {
-        // This fails intentionally on Android Chrome, try/catch prevents the crash
-        new Notification(title, { body, icon: 'icon-192.png' });
-      } catch (err) {
-        console.warn('Native notification blocked by browser rule, bypassing...', err);
-      }
-    }
-  }
+  });
 
   function fireNotification(title, body) {
-    if ('serviceWorker' in navigator) {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
       navigator.serviceWorker.ready.then((reg) => {
         reg.showNotification(title, {
           body,
-          icon: 'icon-192.png', // Fixed root path
-          badge: 'icon-192.png', // Fixed root path
+          icon: 'icons/icon-192.png',
+          badge: 'icons/icon-192.png',
           vibrate: [300, 150, 300],
           requireInteraction: true,
           tag: 'cbse-result-alarm'
         });
-      }).catch(() => fallbackNotify(title, body));
-    } else {
-      fallbackNotify(title, body);
+      });
+    } else if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(title, { body, icon: 'icons/icon-192.png' });
     }
   }
 
-  // ---------- Notification permission ----------
+  // ---------- Notification permission (the one unavoidable manual step —
+  // browsers require a user gesture to grant this; it's a permission, not an alert) ----------
   function refreshPermissionLabel() {
     if (!('Notification' in window)) {
       permissionStatus.textContent = 'Notifications are not supported in this browser.';
       return;
     }
     const map = {
-      granted: 'Notifications are enabled.',
-      denied: 'Notifications are blocked — enable them in your browser/site settings.',
-      default: 'Notifications not yet enabled.'
+      granted: 'Notifications are enabled — you will be alerted automatically.',
+      denied: 'Notifications are blocked — enable them in your browser/site settings to be alerted.',
+      default: 'Tap to allow notifications so the automatic checks can alert you.'
     };
     permissionStatus.textContent = map[Notification.permission];
   }
@@ -171,84 +123,12 @@
     refreshPermissionLabel();
   });
 
-  testAlarmBtn.addEventListener('click', () => {
-    fireNotification('Test alarm — CBSE Result Watch', 'This is what you will see when your alarm rings.');
-    showAlarmOverlay('Test Alarm', 'This is a test. Your real alarm will look like this.');
-  });
-
   refreshPermissionLabel();
 
-  // ---------- Alarm scheduling ----------
-  function loadAlarm() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? raw : null;
-  }
-
-  function saveAlarm(isoLocal) {
-    localStorage.setItem(STORAGE_KEY, isoLocal);
-    localStorage.removeItem(FIRED_KEY);
-  }
-
-  function clearAlarm() {
-    localStorage.removeItem(STORAGE_KEY);
-    localStorage.removeItem(FIRED_KEY);
-    alarmInput.value = '';
-    alarmStatus.textContent = 'No alarm set.';
-  }
-
-  function describeAlarm(isoLocal) {
-    const d = new Date(isoLocal);
-    if (isNaN(d)) return 'No alarm set.';
-    return 'Alarm set for ' + d.toLocaleString(undefined, {
-      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    }) + '.';
-  }
-
-  saveAlarmBtn.addEventListener('click', () => {
-    if (!alarmInput.value) {
-      alarmStatus.textContent = 'Pick a date and time first.';
-      return;
-    }
-    saveAlarm(alarmInput.value);
-    alarmStatus.textContent = describeAlarm(alarmInput.value);
-  });
-
-  clearAlarmBtn.addEventListener('click', clearAlarm);
-
-  function initAlarmUI() {
-    const stored = loadAlarm();
-    if (stored) {
-      alarmInput.value = stored;
-      alarmStatus.textContent = describeAlarm(stored);
-    }
-  }
-
-  function checkAlarm() {
-    const stored = loadAlarm();
-    if (!stored) return;
-    const target = new Date(stored).getTime();
-    const now = Date.now();
-    const alreadyFired = localStorage.getItem(FIRED_KEY) === stored;
-    
-    if (now >= target && !alreadyFired) {
-      localStorage.setItem(FIRED_KEY, stored);
-      fireNotification('Your CBSE result alarm is ringing', 'The time you set has arrived — check the official result links in the app.');
-      showAlarmOverlay('Alarm', 'The time you set has arrived. Check the official result links below.');
-    }
-  }
-
-  // ---------- Data loading ----------
+  // ---------- Data loading (network-first, cache-busted) ----------
   async function loadData() {
     try {
-      const res = await fetch('data.json?ts=' + Date.now(), { 
-        cache: 'no-store',
-        headers: {
-          'Cache-Control': 'no-cache, no-store, must-revalidate',
-          'Pragma': 'no-cache',
-          'Expires': '0'
-        }
-      });
+      const res = await fetch('data.json?ts=' + Date.now(), { cache: 'no-store' });
       return await res.json();
     } catch (e) {
       try {
@@ -265,6 +145,15 @@
     return Math.round((b - a) / MS);
   }
 
+  function formatTimestamp(iso) {
+    if (!iso) return 'Not yet run';
+    const d = new Date(iso);
+    if (isNaN(d)) return 'Not yet run';
+    return d.toLocaleString(undefined, {
+      day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit'
+    });
+  }
+
   function renderData(data) {
     if (!data) {
       statusValue.textContent = 'Could not load data.json';
@@ -272,24 +161,51 @@
       return;
     }
 
+    // ----- Official status -----
     if (data.resultDeclared) {
       statusValue.textContent = 'Result declared';
       statusValue.classList.add('declared');
       statusMeta.textContent = data.officialResultDate
         ? 'Official date on record: ' + data.officialResultDate
-        : 'Marked as declared — check the official links below.';
+        : 'Marked as officially declared — check the official links below.';
 
       const alreadyNotified = localStorage.getItem(DECLARED_FIRED_KEY) === (data.officialResultDate || 'yes');
       if (!alreadyNotified) {
         localStorage.setItem(DECLARED_FIRED_KEY, data.officialResultDate || 'yes');
         fireNotification('CBSE Class 10 Second Board Result is OUT', 'Go to cbseresults.nic.in or DigiLocker to check your result.');
-        showAlarmOverlay('Result Declared', 'The CBSE Class 10 Second Board result has been marked as declared. Check the official links below.');
+        showAlarmOverlay('Result Declared', 'The CBSE Class 10 Second Board result has been officially confirmed. Check the official links below.');
       }
     } else {
       statusValue.textContent = 'Not yet officially declared';
+      statusValue.classList.remove('declared');
       statusMeta.textContent = 'Last verified against official sources on ' + data.lastChecked + '.';
     }
+    officialLastChecked.textContent = data.lastChecked || '—';
 
+    // ----- Automated trusted-news signal -----
+    const news = data.newsSignal || {};
+    newsLastChecked.textContent = formatTimestamp(news.lastChecked);
+
+    if (news.detected) {
+      newsSignalValue.textContent = 'Report detected: ' + (news.source || 'trusted outlet');
+      newsSignalValue.classList.add('signal-detected');
+      if (news.sourceUrl) {
+        newsSourceLink.innerHTML = '<a href="' + news.sourceUrl + '" target="_blank" rel="noopener noreferrer">Open the news report →</a>';
+      }
+
+      const notifiedKey = news.detectedAt || 'yes';
+      if (localStorage.getItem(NEWS_FIRED_KEY) !== notifiedKey && !data.resultDeclared) {
+        localStorage.setItem(NEWS_FIRED_KEY, notifiedKey);
+        fireNotification('Possible CBSE result news — not yet official', (news.source || 'A trusted outlet') + ' is reporting on the result. Verify at an official source before relying on it.');
+        showAlarmOverlay('Trusted News Signal', (news.source || 'A trusted news outlet') + ' appears to be reporting on the result. This is not an official CBSE confirmation yet — check the official links below to be sure.');
+      }
+    } else {
+      newsSignalValue.textContent = 'No report detected yet';
+      newsSignalValue.classList.remove('signal-detected');
+      newsSourceLink.textContent = '';
+    }
+
+    // ----- Countdown / window -----
     const win = data.expectedResultWindow;
     if (win) {
       const today = new Date();
@@ -298,15 +214,13 @@
       const end = new Date(win.latest);
 
       if (today < start) {
-        const d = daysBetween(today, start);
-        countdownNumber.textContent = d;
+        countdownNumber.textContent = daysBetween(today, start);
         countdownUnit.textContent = 'days until the expected window opens';
       } else if (today > end) {
         countdownNumber.textContent = '—';
         countdownUnit.textContent = 'expected window has passed — awaiting official confirmation';
       } else {
-        const d = daysBetween(today, end);
-        countdownNumber.textContent = d;
+        countdownNumber.textContent = daysBetween(today, end);
         countdownUnit.textContent = 'days left in the expected window';
       }
 
@@ -315,6 +229,7 @@
       windowNote.textContent = win.note || '';
     }
 
+    // ----- Sources -----
     sourceList.innerHTML = '';
     (data.officialSources || []).forEach((s) => {
       const li = document.createElement('li');
@@ -327,15 +242,15 @@
       sourceList.appendChild(li);
     });
 
+    // ----- Statements -----
     statementsList.innerHTML = '';
     (win && win.statements || []).forEach((st) => {
       const div = document.createElement('div');
       div.className = 'statement';
-      div.innerHTML = `
-        <p class="statement-source">${st.source}</p>
-        <p class="statement-text">${st.statement}</p>
-        <p class="statement-reliability">${st.reliability}</p>
-      `;
+      div.innerHTML =
+        '<p class="statement-source">' + st.source + '</p>' +
+        '<p class="statement-text">' + st.statement + '</p>' +
+        '<p class="statement-reliability">' + st.reliability + '</p>';
       statementsList.appendChild(div);
     });
 
@@ -345,13 +260,13 @@
   async function refreshAll() {
     const data = await loadData();
     renderData(data);
-    checkAlarm();
   }
 
-  initAlarmUI();
+  // ---------- Init ----------
   refreshAll();
 
-  checkIntervalId = setInterval(checkAlarm, 20 * 1000);
+  // Re-pull data.json every 5 minutes so the app reflects the GitHub Actions
+  // checks (every 3 hours) as soon as possible, entirely on its own.
   setInterval(refreshAll, 5 * 60 * 1000);
 
   document.addEventListener('visibilitychange', () => {
