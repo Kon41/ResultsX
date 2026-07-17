@@ -411,4 +411,67 @@ footer {
   h1 { font-size: 1.25rem; }
   main { padding: 1.2rem; }
 }
+/* --- Live News Check Styles --- */
+.news-card {
+  background: #fffdf8;
+  border: 1px solid var(--paper-line);
+  border-radius: var(--radius);
+  padding: 1.4rem;
+  position: relative;
+}
+
+.news-results {
+  margin-top: 1.2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+/* Ensure hidden works for the news div too */
+.news-results[hidden] {
+  display: none !important;
+}
+
+.news-item {
+  border-left: 3px solid var(--gold);
+  padding-left: 0.9rem;
+}
+
+.news-item-title {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  margin: 0 0 0.35rem;
+}
+
+.news-item-title a {
+  color: var(--navy-deep);
+  text-decoration: none;
+}
+
+.news-item-title a:hover {
+  text-decoration: underline;
+  color: var(--navy);
+}
+
+.news-item-meta {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.loading-text {
+  font-family: 'Space Mono', monospace;
+  font-size: 0.85rem;
+  color: var(--navy);
+  animation: pulse-text 1s infinite alternate;
+}
+
+@keyframes pulse-text {
+  from { opacity: 0.5; }
+  to { opacity: 1; }
+}
 
